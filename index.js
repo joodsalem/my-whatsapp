@@ -9,14 +9,14 @@ app.use(express.json());
 
 const port = 3000;
 
-// التعديل السري هنا: تم تفعيل headless: true لحظر فتح الكروم المزعج
-// وتم تحديد clientId: 'rawa_session' لحفظ الجلسة للأبد في ملفات المشروع
+// التعديل السري هنا: ربط مسار الكروم المستخرج مباشرة بالكود لتخطي عناد النسخ
 const client = new Client({
     authStrategy: new LocalAuth({
         clientId: "rawa_session"
     }),
     puppeteer: {
-        headless: true, // true تعني اشتغل في الخلفية بصمت بدون ما تفتح متصفح أمامنا
+        headless: true, // يشتغل في الخلفية بصمت
+        executablePath: '/opt/render/.cache/puppeteer/chrome/linux-147.0.7727.57/chrome-linux64/chrome',
         args: [
             '--no-sandbox', 
             '--disable-setuid-sandbox',
@@ -29,7 +29,7 @@ const client = new Client({
     }
 });
 
-// 2. عرض الـ QR Code في التيرمينال (سيظهر مرة واحدة فقط في بيتك)
+// 2. عرض الـ QR Code في التيرمينال
 client.on('qr', (qr) => {
     console.log('\n👇 امسح هذا الـ QR Code بجوالك لربط تطبيق رواء (لمرة واحدة فقط):');
     qrcode.generate(qr, { small: true });
