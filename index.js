@@ -16,6 +16,10 @@ const client = new Client({
         clientId: "rawa_session"
     }),
     puppeteer: {
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    }
+});
+    puppeteer: {
         headless: true, // true تعني اشتغل في الخلفية بصمت بدون ما تفتح متصفح أمامنا
         args: [
             '--no-sandbox', 
