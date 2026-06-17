@@ -4,8 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "build": "npm install"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
@@ -15,8 +14,8 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "body-parser": "^2.2.2",
-    "puppeteer": "^23.0.0",
+    "puppeteer": "^24.0.0",
     "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "^1.35.0"
+    "whatsapp-web.js": "^1.34.7"
   }
 }
