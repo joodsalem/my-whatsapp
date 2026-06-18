@@ -15,7 +15,6 @@ let clientReady = false;
 
 // 🔍 دالة ذكية للبحث عن المتصفح داخل بيئة الـ Docker لمنع أخطاء المسارات
 function findChromeExecutable() {
-    // المسارات الشائعة في حاويات قوقل و Puppeteer
     const commonPaths = [
         '/usr/bin/chrome',
         '/usr/bin/google-chrome',
@@ -30,7 +29,6 @@ function findChromeExecutable() {
         }
     }
     
-    // إذا لم يجد في المسارات المباشرة، يبحث داخل الكاش الخاص بـ Puppeteer
     const cacheDir = '/home/pptruser/.cache/puppeteer';
     if (fs.existsSync(cacheDir)) {
         try {
@@ -55,23 +53,22 @@ function findChromeExecutable() {
 
 const chromePath = findChromeExecutable();
 
-// إعدادات الـ Client المخصصة والمستقرة لـ Docker مع تحسين استهلاك الرام
+// 🛠️ إعدادات المتصفح المطورة لخداع أمان الواتساب وتوفير طاقة السيرفر المجاني
 const puppeteerConfig = {
-    headless: true,
+    headless: "new", // 🌟 التحديث الجديد والموصى به لمنع كلمة "يتعذر الربط"
     args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--no-first-run',         // 🌟 تسريع تشغيل المتصفح الأولي
-        '--no-zygote',            // 🌟 توفير الرام داخل بيئة السيرفر الضعيفة
-        '--single-process',       // 🌟 منع الكروم من فتح عمليات متعددة تستهلك السيرفر
+        '--no-first-run',         
+        '--no-zygote',            
+        '--single-process',       
         '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
     ],
-    timeout: 0 // 🎯 إلغاء مهلة المتصفح لتجنب الانهيار المفاجئ أثناء محاولة نقل البيانات للجوال
+    timeout: 0 
 };
 
-// إذا وجدنا المسار الذكي نقوم بتعيينه فوراً
 if (chromePath) {
     puppeteerConfig.executablePath = chromePath;
 }
@@ -81,8 +78,8 @@ const client = new Client({
         clientId: "rawa_session"
     }),
     puppeteer: puppeteerConfig,
-    authTimeoutMs: 120000, // 🎯 إعطاء السيرفر مهلة دقيقتين كاملتين لتهيئة الجلسة بدلاً من 45 ثانية
-    qrMaxRetries: 10       // 🎯 إتاحة إعادة توليد كود الـ QR لمرات أكثر قبل الاستسلام
+    authTimeoutMs: 120000, // 🎯 دقيقتين كاملة انتظار للجوال لتهيئة البيانات
+    qrMaxRetries: 15       // 🎯 محاولات توليد أكثر للباركود لمنع الفصل الفجائي
 });
 
 // الأحداث (Events)
@@ -115,7 +112,7 @@ app.get('/', (req, res) => {
                 <br>
                 <img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(latestQr)}&size=300x300" style="border: 2px solid #ccc; padding: 10px; border-radius: 10px;">
                 <br><br>
-                <p style="color:gray;">حدثي الصفحة إذا انتهت صلاحية الباركود، وامسحيه بسرعة فور ظهوره</p>
+                <p style="color:gray;">ملاحظة: امسحي الباركود بسرعة فور ظهوره وخلي الصفحة مفتوحة بالكمبيوتر</p>
             </div>
         `);
     }
