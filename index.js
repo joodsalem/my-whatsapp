@@ -13,7 +13,7 @@ const port = process.env.PORT || 3000;
 let latestQr = null;
 let clientReady = false;
 
-// 🔍 وظيفة ذكية للبحث عن المتصفح داخل مجلد المشروع وضمان بقائه عند التشغيل
+// 🔍 فاحص مسار الكروم الذكي والمضمون داخل السيرفر
 function getLocalChromePath() {
     const baseDir = path.join(__dirname, '.local-chrome', 'chrome');
     if (fs.existsSync(baseDir)) {
@@ -29,20 +29,23 @@ function getLocalChromePath() {
     return null;
 }
 
-// إعدادات البابيتير الأساسية
+// إعدادات البابيتير المحسنة لحل مشكلة تعليق تسجيل الدخول
 const puppeteerConfig = {
-    headless: "new",
+    headless: true, // متوافق تماماً مع نسخة Puppeteer 24
     args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--disable-web-resources'
+        '--disable-extensions',
+        '--no-first-run',
+        '--no-zygote',
+        // 🌟 إضافة User-Agent حديث وحقيقي عشان الواتساب ما يشك أنه بوت ويعلق التسجيل
+        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
     ],
     timeout: 60000
 };
 
-// تشغيل الفحص الذكي عن المتصفح المجلد المحلي
 const localChrome = getLocalChromePath();
 if (localChrome) {
     puppeteerConfig.executablePath = localChrome;
