@@ -1,7 +1,8 @@
 const express = require('express');
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 app.use(cors());
@@ -12,7 +13,23 @@ const port = process.env.PORT || 3000;
 let latestQr = null;
 let clientReady = false;
 
-// إعدادات البابيتير الافتراضية والذكية لـ Render
+// 🔍 وظيفة ذكية للبحث عن المتصفح داخل مجلد المشروع وضمان بقائه عند التشغيل
+function getLocalChromePath() {
+    const baseDir = path.join(__dirname, '.local-chrome', 'chrome');
+    if (fs.existsSync(baseDir)) {
+        const folders = fs.readdirSync(baseDir);
+        for (const folder of folders) {
+            const execPath = path.join(baseDir, folder, 'chrome-linux64', 'chrome');
+            if (fs.existsSync(execPath)) {
+                console.log(`🎯 تم العثور على المتصفح تلقائياً في: ${execPath}`);
+                return execPath;
+            }
+        }
+    }
+    return null;
+}
+
+// إعدادات البابيتير الأساسية
 const puppeteerConfig = {
     headless: "new",
     args: [
@@ -22,15 +39,16 @@ const puppeteerConfig = {
         '--disable-gpu',
         '--disable-web-resources'
     ],
-    timeout: 60000 // رفعنا وقت الانتظار ليتناسب مع السيرفر المجاني
+    timeout: 60000
 };
 
-// إذا قمتِ بحذف المتغير من Render، سيعتمد الكود على المسار التلقائي للحزمة الجديدة فوراً
-if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-    puppeteerConfig.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+// تشغيل الفحص الذكي عن المتصفح المجلد المحلي
+const localChrome = getLocalChromePath();
+if (localChrome) {
+    puppeteerConfig.executablePath = localChrome;
 }
 
-// تعريف الـ client لمرة واحدة فقط بشكل صحيح
+// تعريف الـ client
 const client = new Client({
     authStrategy: new LocalAuth({
         clientId: "rawa_session"
