@@ -1,10 +1,9 @@
 {
   "name": "whatsapp-service",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js",
-    "postinstall": "npm install -g chromium"
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
