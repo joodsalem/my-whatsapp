@@ -55,7 +55,7 @@ function findChromeExecutable() {
 
 const chromePath = findChromeExecutable();
 
-// إعدادات الـ Client المخصصة والمستقرة لـ Docker
+// إعدادات الـ Client المخصصة والمستقرة لـ Docker مع تحسين استهلاك الرام
 const puppeteerConfig = {
     headless: true,
     args: [
@@ -63,9 +63,12 @@ const puppeteerConfig = {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
+        '--no-first-run',         // 🌟 تسريع تشغيل المتصفح الأولي
+        '--no-zygote',            // 🌟 توفير الرام داخل بيئة السيرفر الضعيفة
+        '--single-process',       // 🌟 منع الكروم من فتح عمليات متعددة تستهلك السيرفر
         '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
     ],
-    timeout: 60000
+    timeout: 0 // 🎯 إلغاء مهلة المتصفح لتجنب الانهيار المفاجئ أثناء محاولة نقل البيانات للجوال
 };
 
 // إذا وجدنا المسار الذكي نقوم بتعيينه فوراً
@@ -77,7 +80,9 @@ const client = new Client({
     authStrategy: new LocalAuth({
         clientId: "rawa_session"
     }),
-    puppeteer: puppeteerConfig
+    puppeteer: puppeteerConfig,
+    authTimeoutMs: 120000, // 🎯 إعطاء السيرفر مهلة دقيقتين كاملتين لتهيئة الجلسة بدلاً من 45 ثانية
+    qrMaxRetries: 10       // 🎯 إتاحة إعادة توليد كود الـ QR لمرات أكثر قبل الاستسلام
 });
 
 // الأحداث (Events)
@@ -110,7 +115,7 @@ app.get('/', (req, res) => {
                 <br>
                 <img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(latestQr)}&size=300x300" style="border: 2px solid #ccc; padding: 10px; border-radius: 10px;">
                 <br><br>
-                <p style="color:gray;">حدثي الصفحة إذا انتهت صلاحية الباركود</p>
+                <p style="color:gray;">حدثي الصفحة إذا انتهت صلاحية الباركود، وامسحيه بسرعة فور ظهوره</p>
             </div>
         `);
     }
