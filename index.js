@@ -11,13 +11,14 @@ const port = process.env.PORT || 10000;
 let latestQr = null;
 let clientReady = false;
 
-// إعدادات مجهزة خصيصاً لبيئة Docker المستقرة
+// 🌟 تعديل إعدادات المتصفح ليوجه مباشرة للكروم المثبت في الـ Docker
 const client = new Client({
     authStrategy: new LocalAuth({
         clientId: "rawa_session"
     }),
     puppeteer: {
         headless: true,
+        executablePath: '/usr/bin/google-chrome', // 🎯 هنا السحر! تحديد مكان الكروم المضمون
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
