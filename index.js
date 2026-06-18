@@ -7,74 +7,64 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const port = 3000;
+const port = process.env.PORT || 3000;
 
-// حفظ الباركود في متغير لعرضه كصورة نظيفة
 let latestQr = null;
+let clientReady = false;
 
 const client = new Client({
     authStrategy: new LocalAuth({
         clientId: "rawa_session"
     }),
     puppeteer: {
-        headless: true,
+        headless: "new",
         args: [
-            '--no-sandbox', 
+            '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu'
-        ]
+            '--disable-gpu',
+            '--disable-web-resources'
+        ],
+        timeout: 30000
     }
 });
 
-// استقبال الباركود وحفظه
 client.on('qr', (qr) => {
-    console.log('⚠️ تم توليد باركود جديد، يمكنك رؤيته عبر الرابط الآن!');
+    console.log('⚠️ QR Code generated');
     latestQr = qr;
 });
 
-// تأكيد الاتصال
 client.on('ready', () => {
-    console.log('\n✅✅ [واتساب متصل وجاهز!]');
-    latestQr = null; // نمسح الباركود بعد نجاح الاتصال
-});
-
-client.on('disconnected', (reason) => {
-    console.log('⚠️ تم تسجيل الخروج من الواتساب، السبب:', reason);
+    console.log('✅ WhatsApp Connected!');
+    clientReady = true;
     latestQr = null;
 });
 
-// الرابط السحري اللي بيفتح لك الباركود كصورة واضحة في المتصفح أو الجوال
-app.get('/', (req, res) => {
-    if (latestQr) {
-        res.send(`
-            <div style="text-align:center; margin-top:50px; font-family:Arial;">
-                <h2>👇 امسحي الباركود بجوالك لربط تطبيق رواء:</h2>
-                <div style="margin: 20px auto; padding: 20px; background: white; display: inline-block; border: 2px solid #ccc;">
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(latestQr)}" />
-                </div>
-                <p style="color:gray; margin-top:20px;">حدثي الصفحة إذا انتهت صلاحية الباركود أو تأخر في الظهور</p>
-            </div>
-        `);
-    } else if (client.pupBrowser) {
-        res.send('<h2 style="text-align:center; margin-top:50px; color:green;">✅ الواتساب متصل وجاهز وشغال 100%!</h2>');
-    } else {
-        res.send('<h2 style="text-align:center; margin-top:50px; color:orange;">⏳ جاري تجهيز الباركود، انتظر ثواني وحدث الصفحة...</h2>');
-    }
+client.on('disconnected', (reason) => {
+    console.log('⚠️ Disconnected:', reason);
+    clientReady = false;
+    latestQr = null;
 });
 
-// الـ Endpoint لإرسال الـ OTP من الـ C#
+app.get('/', (req, res) => {
+    if (!clientReady) {
+        return res.send('<h2 style="text-align:center; color:red;">❌ WhatsApp Not Connected</h2>');
+    }
+    res.send('<h2 style="text-align:center; color:green;">✅ WhatsApp Connected!</h2>');
+});
+
 app.post('/api/send-whatsapp', async (req, res) => {
     try {
-        const { phoneNumber, otpCode } = req.body;
-        if (!phoneNumber || !otpCode) {
-            return res.status(400).json({ error: 'رقم الجوال ورمز التحقق مطلوبان' });
+        if (!clientReady) {
+            return res.status(503).json({ error: 'WhatsApp not connected yet' });
         }
 
-        let cleanNumber = phoneNumber.replace(/\D/g, ''); 
+        const { phoneNumber, otpCode } = req.body;
+        if (!phoneNumber || !otpCode) {
+            return res.status(400).json({ error: 'Phone and OTP required' });
+        }
+
+        let cleanNumber = phoneNumber.replace(/\D/g, '');
         if (cleanNumber.startsWith('0')) {
             cleanNumber = '967' + cleanNumber.substring(1);
         } else if (cleanNumber.startsWith('7') && cleanNumber.length === 9) {
@@ -82,19 +72,22 @@ app.post('/api/send-whatsapp', async (req, res) => {
         }
 
         const chatId = cleanNumber + '@c.us';
-        const message = `مرحباً بك في تطبيق رواء 💧\n\nرمز التحقق الخاص بك هو: *${otpCode}*\n\nلا تشارك هذا الرمز مع أحد لدواعي الأمان.`;
+        const message = `مرحباً بك في تطبيق رواء 💧\n\nرمز التحقق: *${otpCode}*`;
 
         await client.sendMessage(chatId, message);
-        console.log(`🚀 [رواء] تم إرسال الرمز [${otpCode}] إلى الرقم [${cleanNumber}] بنجاح.`);
-        res.status(200).json({ success: true, message: 'تم الإرسال بنجاح' });
+        console.log(`✅ OTP sent to ${cleanNumber}`);
+        res.json({ success: true, message: 'تم الإرسال بنجاح' });
     } catch (error) {
-        console.error('❌ خطأ في إرسال الرسالة:', error);
-        res.status(500).json({ error: 'حدث خطأ أثناء إرسال الرسالة عبر واتساب' });
+        console.error('Error:', error.message);
+        res.status(500).json({ error: error.message });
     }
 });
 
-app.listen(port, () => {
-    console.log(`🚀 سيرفر الواتساب شغال على البورت ${port}`);
+app.listen(port, '0.0.0.0', () => {
+    console.log(`🚀 Server running on port ${port}`);
 });
 
-client.initialize();
+client.initialize().catch(err => {
+    console.error('Failed to initialize:', err);
+    process.exit(1);
+});
