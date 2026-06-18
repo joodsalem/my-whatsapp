@@ -91,3 +91,24 @@ client.initialize().catch(err => {
     console.error('Failed to initialize:', err);
     process.exit(1);
 });
+const puppeteerConfig = {
+    headless: true,
+    args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+    ]
+};
+
+// إذا كان هناك PUPPETEER_EXECUTABLE_PATH فاستخدمه
+if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    puppeteerConfig.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+}
+
+const client = new Client({
+    authStrategy: new LocalAuth({
+        clientId: "rawa_session"
+    }),
+    puppeteer: puppeteerConfig
+});
