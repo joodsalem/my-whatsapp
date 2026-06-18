@@ -12,7 +12,7 @@ const port = process.env.PORT || 3000;
 let latestQr = null;
 let clientReady = false;
 
-// تجهيز إعدادات Puppeteer الذكية ومنع التكرار
+// إعدادات البابيتير الافتراضية والذكية لـ Render
 const puppeteerConfig = {
     headless: "new",
     args: [
@@ -22,15 +22,15 @@ const puppeteerConfig = {
         '--disable-gpu',
         '--disable-web-resources'
     ],
-    timeout: 30000
+    timeout: 60000 // رفعنا وقت الانتظار ليتناسب مع السيرفر المجاني
 };
 
-// إذا كان Render موفر مسار للمتصفح نستخدمه فوراً
+// إذا قمتِ بحذف المتغير من Render، سيعتمد الكود على المسار التلقائي للحزمة الجديدة فوراً
 if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     puppeteerConfig.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
 }
 
-// تعريف الـ client لمرة واحدة فقط بشكل صحيح وعالمي
+// تعريف الـ client لمرة واحدة فقط بشكل صحيح
 const client = new Client({
     authStrategy: new LocalAuth({
         clientId: "rawa_session"
@@ -56,7 +56,7 @@ client.on('disconnected', (reason) => {
     latestQr = null;
 });
 
-// تعديل مسار الصفحة الرئيسية عشان يعرض لكِ الباركود لو مش شابك بدل الصفحة الفاضية!
+// صفحة المتصفح الرئيسية لعرض الباركود
 app.get('/', (req, res) => {
     if (clientReady) {
         return res.send('<h2 style="text-align:center; color:green; font-family:sans-serif;">✅ الواتساب متصل بنجاح! تطبيق رواء جاهز.</h2>');
