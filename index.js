@@ -64,7 +64,7 @@ const puppeteerConfig = {
         '--no-first-run',         
         '--no-zygote',            
         '--single-process',       
-        // تحديث الـ User-Agent إلى نسخة أحدث وأكثر استقراراً متوافقة مع التحديث الأخير لـ WhatsApp Web
+        // تحديث الـ User-Agent إلى نسخة مستقرة ومحدثة متوافقة مع تغييرات فريمات واتساب ويب
         '--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
     ],
     timeout: 0 
@@ -120,7 +120,7 @@ app.get('/', (req, res) => {
     res.send('<h2 style="text-align:center; color:orange; font-family:sans-serif;">⏳ السيرفر يشتغل، انتظر ثواني لتوليد الباركود...</h2>');
 });
 
-// مسار إرسال الـ OTP المطور والمقاوم لأخطاء المتصفح (Detached Frame)
+// مسار إرسال الـ OTP المحصن والمطور ضد أخطاء الـ Detached Frame والطلبات المتكررة
 app.post('/api/send-whatsapp', async (req, res) => {
     try {
         if (!clientReady) return res.status(503).json({ error: 'WhatsApp not connected yet' });
@@ -143,14 +143,26 @@ app.post('/api/send-whatsapp', async (req, res) => {
 
         console.log(`📡 جاري إرسال الرسالة مباشرة إلى: ${chatId} بالرمز: ${otpCode}`);
 
-        // 🔄 آلية إعادة المحاولة (Retry) الذكية لتجاوز تعليقات فريم المتصفح المؤقتة
+        // ⏳ حماية ذكية: انتظار بسيط لامتصاص صدمات تكرار الطلبات الفورية من الباكيند
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // 🔄 آلية إعادة المحاولة (Retry) الذكية مع إعادة لقط الفريم في المتصفح
         let attempts = 0;
-        const maxAttempts = 2;
+        const maxAttempts = 3; 
         let lastError = null;
 
         while (attempts < maxAttempts) {
             try {
-                await client.sendMessage(chatId, message);
+                // التأكد من استقرار صفحة المتصفح في الخلفية قبل تنفيذ الإرسال
+                if (client.puppeteer && client.puppeteer.page) {
+                    await Promise.race([
+                        client.sendMessage(chatId, message),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+                    ]);
+                } else {
+                    await client.sendMessage(chatId, message);
+                }
+
                 console.log(`✅ [رواء] طارت الرسالة بنجاح في المحاولة رقم ${attempts + 1}!`);
                 return res.json({ success: true, message: 'تم الإرسال بنجاح' });
             } catch (sendError) {
@@ -158,21 +170,26 @@ app.post('/api/send-whatsapp', async (req, res) => {
                 lastError = sendError;
                 console.warn(`⚠️ محاولة إرسال فاشلة (${attempts}/${maxAttempts}): ${sendError.message}`);
                 
-                // إذا واجهنا خطأ الفريم، ننتظر ثانية واحدة لكي يستقر المتصفح ثم نعيد المحاولة
+                // إذا علق فريم المتصفح، ننتظر ثانيتين لكي تستقر الواجهة تماماً ثم نعيد الإرسال
                 if (attempts < maxAttempts) {
-                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                 }
             }
         }
 
-        // إذا وصلنا هنا فهذا يعني أن جميع المحاولات فشلت
+        // إذا وصلنا هنا فهذا يعني أن جميع المحاولات المحصنة قد استُنفدت
         throw lastError;
 
     } catch (error) {
-        console.error(`❌ فشل الإرسال نهائياً:`, error.message);
-        // نرد بـ 200 مع حالة فشل لحماية التطبيق والفلاتر من الانهيار
+        console.error(`❌ فشل الإرسال نهائياً بعد المحاولات:`, error.message);
+        // نرد بـ 200 نجاح وهمي للفلاتر دائماً لمنع تعليق واجهات المستخدم والـ UI عند الطالبات
         res.status(200).json({ success: false, error: error.message });
     }
+});
+
+app.use((err, req, res, next) => {
+    console.error("Unhandled global error:", err.message);
+    res.status(200).json({ success: false, error: "Internal stability handoff" });
 });
 
 app.listen(port, '0.0.0.0', () => {
