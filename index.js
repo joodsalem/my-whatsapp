@@ -55,7 +55,7 @@ const chromePath = findChromeExecutable();
 
 // 🛠️ إعدادات المتصفح المطورة لخداع أمان الواتساب وتوفير طاقة السيرفر المجاني
 const puppeteerConfig = {
-    headless: "new", // 🌟 التحديث الجديد والموصى به لمنع كلمة "يتعذر الربط"
+    headless: "new", 
     args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -78,8 +78,8 @@ const client = new Client({
         clientId: "rawa_session"
     }),
     puppeteer: puppeteerConfig,
-    authTimeoutMs: 120000, // 🎯 دقيقتين كاملة انتظار للجوال لتهيئة البيانات
-    qrMaxRetries: 15       // 🎯 محاولات توليد أكثر للباركود لمنع الفصل الفجائي
+    authTimeoutMs: 120000, 
+    qrMaxRetries: 15       
 });
 
 // الأحداث (Events)
@@ -119,18 +119,13 @@ app.get('/', (req, res) => {
     res.send('<h2 style="text-align:center; color:orange; font-family:sans-serif;">⏳ السيرفر يشتغل، انتظر ثواني لتوليد الباركود...</h2>');
 });
 
-// مسار إرسال الـ OTP المطور والمقاوم للخطأ 500
+// مسار إرسال الـ OTP الآمن والمستقر ضد انهيارات الـ 500
 app.post('/api/send-whatsapp', async (req, res) => {
     try {
-        if (!clientReady) {
-            console.log("⚠️ محاولة إرسال والواتساب غير متصل بالسيرفر");
-            return res.status(503).json({ error: 'WhatsApp not connected yet' });
-        }
+        if (!clientReady) return res.status(503).json({ error: 'WhatsApp not connected yet' });
 
         const { phoneNumber, otpCode } = req.body;
-        if (!phoneNumber || !otpCode) {
-            return res.status(400).json({ error: 'Phone and OTP required' });
-        }
+        if (!phoneNumber || !otpCode) return res.status(400).json({ error: 'Phone and OTP required' });
 
         // 1. تنظيف الرقم تماماً
         let cleanNumber = phoneNumber.replace(/\D/g, '');
@@ -142,30 +137,20 @@ app.post('/api/send-whatsapp', async (req, res) => {
             cleanNumber = '967' + cleanNumber;
         }
 
-        // 3. صياغة المعرّف الافتراضي
         const chatId = cleanNumber + '@c.us';
         const message = `مرحباً بك في تطبيق رواء 💧\n\nرمز التحقق: *${otpCode}*`;
 
-        console.log(`📡 جاري فحص الرقم وإرسال الرسالة إلى: ${chatId}`);
+        console.log(`📡 جاري إرسال الرسالة مباشرة إلى: ${chatId} بالرمز: ${otpCode}`);
 
-        // ✨ التعديل الآمن لمنع الانهيار (500): التحقق من تهيئة الرقم في سيرفر الواتساب
-        try {
-            const contact = await client.getNumberId(cleanNumber);
-            const targetId = contact ? contact._serialized : chatId;
-
-            await client.sendMessage(targetId, message);
-            console.log(`✅ [رواء] طارت الرسالة بنجاح إلى: ${targetId}`);
-            return res.json({ success: true, message: 'تم الإرسال بنجاح' });
-        } catch (sendError) {
-            console.error(`❌ فشل الإرسال عبر المعرف المهيأ، جاري التجربة الاحتياطية:`, sendError.message);
-            // محاولة أخيرة بالمعرف التقليدي في حال فشل الفحص المسبق
-            await client.sendMessage(chatId, message);
-            return res.json({ success: true, message: 'تم الإرسال بالطريقة الاحتياطية' });
-        }
+        // إرسال مباشر وآمن من الأخطاء الداخلية
+        await client.sendMessage(chatId, message);
+        console.log(`✅ [رواء] طارت الرسالة بنجاح!`);
+        return res.json({ success: true, message: 'تم الإرسال بنجاح' });
 
     } catch (error) {
-        console.error(`💥 خطأ داخلي في السيرفر (500):`, error.message);
-        res.status(500).json({ error: error.message });
+        console.error(`❌ خطأ أثناء إرسال الرسالة:`, error.message);
+        // نرد بـ 200 مع حالة فشل عشان الفلاتر ما يعلق ويعرف وش المشكلة
+        res.status(200).json({ success: false, error: error.message });
     }
 });
 
