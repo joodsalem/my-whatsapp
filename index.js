@@ -13,43 +13,67 @@ const port = process.env.PORT || 10000;
 let latestQr = null;
 let clientReady = false;
 
-// 🔍 دالة البحث عن الكروم
+// 🔍 دالة مطورة ومحسنة للبحث عن الكروم وإجبار السيرفر على مسار مستقر
 function findChromeExecutable() {
     const commonPaths = [
-        '/usr/bin/chrome',
-        '/usr/bin/google-chrome',
         '/usr/bin/google-chrome-stable',
-        '/home/pptruser/.cache/puppeteer'
+        '/usr/bin/google-chrome',
+        '/usr/bin/chrome',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser'
     ];
 
     for (const p of commonPaths) {
-        if (fs.existsSync(p) && fs.lstatSync(p).isFile()) {
-            console.log(`🎯 تم العثور على الكروم في: ${p}`);
+        if (fs.existsSync(p)) {
+            console.log(`🎯 تم العثور على الكروم في المسار النظامي: ${p}`);
             return p;
         }
     }
-    return null;
+
+    // البحث داخل كاش بوبيتير المتوقع في ريلواي
+    const cacheDir = '/home/pptruser/.cache/puppeteer';
+    if (fs.existsSync(cacheDir)) {
+        try {
+            const files = fs.readdirSync(cacheDir, { recursive: true });
+            for (const file of files) {
+                if (file.endsWith('/chrome') || file.endsWith('/google-chrome')) {
+                    const fullPath = path.join(cacheDir, file);
+                    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+                        console.log(`🎯 تم العثور على الكروم داخل الكاش: ${fullPath}`);
+                        return fullPath;
+                    }
+                }
+            }
+        } catch (e) {
+            console.log("Searching cache failed:", e.message);
+        }
+    }
+    
+    // الحل الاحتياطي الأضمن لبيئات Docker/Railway إذا لم تنجح الأداة في التحقق الصريح
+    console.log("⚠️ سيتم استخدام المسار الافتراضي للينكس المضمون داخل ريلواي");
+    return 'google-chrome-stable'; 
 }
 
 const chromePath = findChromeExecutable();
 
-// 🛠️ إعدادات المتصفح فائقة الخفة لمنع انهيار الذاكرة (Crash) في ريلواي
+// 🛠️ إعدادات متصفح فائقة الخفة ومقاومة للكراش واستنزاف الذاكرة
 const puppeteerConfig = {
     headless: "new", 
     args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage', // إجبار الكروم على عدم استهلاك الذاكرة المشتركة
+        '--disable-dev-shm-usage',
         '--disable-gpu',
         '--no-first-run',         
         '--no-zygote',            
-        '--single-process', // تشغيل المتصفح في بروسيس واحدة لتوفير الـ RAM
-        '--disable-extensions', // تعطيل الإضافات لتقليل الضغط
+        '--single-process',
+        '--disable-extensions',
         '--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
     ],
-    timeout: 60000 // زيادة مهلة الانتظار حتى لا يقفل السيرفر فجأة
+    timeout: 60000
 };
 
+// إسناد المسار المستقر المكتشف أو البديل المضمون
 if (chromePath) {
     puppeteerConfig.executablePath = chromePath;
 }
@@ -79,7 +103,6 @@ client.on('disconnected', (reason) => {
     console.log('⚠️ Disconnected:', reason);
     clientReady = false;
     latestQr = null;
-    // إعادة تشغيل العميل تلقائياً في حال انهار الاتصال
     client.initialize().catch(e => console.log("Re-init failed:", e.message));
 });
 
@@ -100,7 +123,7 @@ app.get('/', (req, res) => {
     res.send('<h2 style="text-align:center; color:orange; font-family:sans-serif;">⏳ السيرفر يشتغل، انتظر ثواني لتوليد الباركود...</h2>');
 });
 
-// مسار إرسال الـ OTP النهائي والمستقر والخفيف جداً على الـ RAM
+// مسار إرسال الـ OTP المستقر والخفيف جداً
 app.post('/api/send-whatsapp', async (req, res) => {
     try {
         if (!clientReady) return res.status(503).json({ error: 'WhatsApp not connected yet' });
@@ -120,17 +143,14 @@ app.post('/api/send-whatsapp', async (req, res) => {
 
         console.log(`📡 جاري إرسال الرسالة مباشرة إلى: ${chatId} بالرمز: ${otpCode}`);
 
-        // ⏳ مهلة بسيطة ومباشرة
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // إرسال كلاسيكي خفيف ومباشر جداً بدون جلب كائنات معقدة تستهلك الذاكرة
         let attempts = 0;
         const maxAttempts = 3;
         let lastError = null;
 
         while (attempts < maxAttempts) {
             try {
-                // استخدام دالة الإرسال الأساسية الخفيفة تماماً لتجنب الكراش
                 await client.sendMessage(chatId, message);
                 console.log(`✅ [رواء] طارت الرسالة بنجاح في المحاولة رقم ${attempts + 1}!`);
                 return res.json({ success: true, message: 'تم الإرسال بنجاح' });
