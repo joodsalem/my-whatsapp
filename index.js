@@ -119,7 +119,7 @@ app.get('/', (req, res) => {
     res.send('<h2 style="text-align:center; color:orange; font-family:sans-serif;">⏳ السيرفر يشتغل، انتظر ثواني لتوليد الباركود...</h2>');
 });
 
-// مسار إرسال الـ OTP النهائي والمستقر 100% لتفادي تعليق فريمات الصفحة (Detached Frame)
+// مسار إرسال الـ OTP المطور والمحصن ضد أخطاء الـ Detached Frame بالاعتماد على تنشيط المحادثة
 app.post('/api/send-whatsapp', async (req, res) => {
     try {
         if (!clientReady) return res.status(503).json({ error: 'WhatsApp not connected yet' });
@@ -145,15 +145,16 @@ app.post('/api/send-whatsapp', async (req, res) => {
         // ⏳ حماية ذكية: انتظار بسيط لامتصاص صدمات تكرار الطلبات الفورية من السي شارب
         await new Promise(resolve => setTimeout(resolve, 1500));
 
-        // 🔄 آلية إعادة المحاولة (Retry) المستقرة والمباشرة لتخطي مشاكل الفريمات المتصادمة
+        // 🔄 آلية إعادة المحاولة الذكية عبر جلب الـ Chat أولاً لتنشيط صفحة الفريم المعلقة غصب عنها
         let attempts = 0;
         const maxAttempts = 3; 
         let lastError = null;
 
         while (attempts < maxAttempts) {
             try {
-                // إرسال مباشر صريح يعتمد على نواة البروتوكول متخطياً فحص عناصر شاشة الفريم المعلقة
-                await client.sendMessage(chatId, message);
+                // 💡 التكتيك السحري لإنعاش المتصفح: نجبره يبحث عن المحادثة ويفوق من الـ التعليق قبل الإرسال
+                const chat = await client.getChatById(chatId);
+                await chat.sendMessage(message);
                 
                 console.log(`✅ [رواء] طارت الرسالة بنجاح في المحاولة رقم ${attempts + 1}!`);
                 return res.json({ success: true, message: 'تم الإرسال بنجاح' });
@@ -169,12 +170,12 @@ app.post('/api/send-whatsapp', async (req, res) => {
             }
         }
 
-        // إذا وصلنا هنا فهذا يعني أن جميع المحاولات المباشرة قد استُنفدت
+        // إذا وصلنا هنا فهذا يعني أن جميع المحاولات المحصنة قد استُنفدت
         throw lastError;
 
     } catch (error) {
         console.error(`❌ فشل الإرسال نهائياً بعد المحاولات:`, error.message);
-        // نرد بـ 200 نجاح وهمي دائماً لمنع تعليق واجهات المستخدم والـ UI عند الطالبات
+        // نرد بـ 200 نجاح وهمي دائماً لمنع تعليق واجهات المستخدم والـ UI عند البنات
         res.status(200).json({ success: false, error: error.message });
     }
 });
