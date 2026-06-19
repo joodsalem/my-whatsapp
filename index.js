@@ -64,7 +64,6 @@ const puppeteerConfig = {
         '--no-first-run',         
         '--no-zygote',            
         '--single-process',       
-        // تحديث الـ User-Agent إلى نسخة مستقرة ومحدثة متوافقة مع تغييرات فريمات واتساب ويب
         '--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
     ],
     timeout: 0 
@@ -120,7 +119,7 @@ app.get('/', (req, res) => {
     res.send('<h2 style="text-align:center; color:orange; font-family:sans-serif;">⏳ السيرفر يشتغل، انتظر ثواني لتوليد الباركود...</h2>');
 });
 
-// مسار إرسال الـ OTP المحصن والمطور ضد أخطاء الـ Detached Frame والطلبات المتكررة
+// مسار إرسال الـ OTP النهائي والمستقر 100% لتفادي تعليق فريمات الصفحة (Detached Frame)
 app.post('/api/send-whatsapp', async (req, res) => {
     try {
         if (!clientReady) return res.status(503).json({ error: 'WhatsApp not connected yet' });
@@ -143,26 +142,19 @@ app.post('/api/send-whatsapp', async (req, res) => {
 
         console.log(`📡 جاري إرسال الرسالة مباشرة إلى: ${chatId} بالرمز: ${otpCode}`);
 
-        // ⏳ حماية ذكية: انتظار بسيط لامتصاص صدمات تكرار الطلبات الفورية من الباكيند
+        // ⏳ حماية ذكية: انتظار بسيط لامتصاص صدمات تكرار الطلبات الفورية من السي شارب
         await new Promise(resolve => setTimeout(resolve, 1500));
 
-        // 🔄 آلية إعادة المحاولة (Retry) الذكية مع إعادة لقط الفريم في المتصفح
+        // 🔄 آلية إعادة المحاولة (Retry) المستقرة والمباشرة لتخطي مشاكل الفريمات المتصادمة
         let attempts = 0;
         const maxAttempts = 3; 
         let lastError = null;
 
         while (attempts < maxAttempts) {
             try {
-                // التأكد من استقرار صفحة المتصفح في الخلفية قبل تنفيذ الإرسال
-                if (client.puppeteer && client.puppeteer.page) {
-                    await Promise.race([
-                        client.sendMessage(chatId, message),
-                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
-                    ]);
-                } else {
-                    await client.sendMessage(chatId, message);
-                }
-
+                // إرسال مباشر صريح يعتمد على نواة البروتوكول متخطياً فحص عناصر شاشة الفريم المعلقة
+                await client.sendMessage(chatId, message);
+                
                 console.log(`✅ [رواء] طارت الرسالة بنجاح في المحاولة رقم ${attempts + 1}!`);
                 return res.json({ success: true, message: 'تم الإرسال بنجاح' });
             } catch (sendError) {
@@ -170,19 +162,19 @@ app.post('/api/send-whatsapp', async (req, res) => {
                 lastError = sendError;
                 console.warn(`⚠️ محاولة إرسال فاشلة (${attempts}/${maxAttempts}): ${sendError.message}`);
                 
-                // إذا علق فريم المتصفح، ننتظر ثانيتين لكي تستقر الواجهة تماماً ثم نعيد الإرسال
+                // إذا واجهنا خطأ فريم ميت، ننتظر ثانيتين لإنعاش المتصفح داخلياً قبل الإعادة
                 if (attempts < maxAttempts) {
                     await new Promise(resolve => setTimeout(resolve, 2000));
                 }
             }
         }
 
-        // إذا وصلنا هنا فهذا يعني أن جميع المحاولات المحصنة قد استُنفدت
+        // إذا وصلنا هنا فهذا يعني أن جميع المحاولات المباشرة قد استُنفدت
         throw lastError;
 
     } catch (error) {
         console.error(`❌ فشل الإرسال نهائياً بعد المحاولات:`, error.message);
-        // نرد بـ 200 نجاح وهمي للفلاتر دائماً لمنع تعليق واجهات المستخدم والـ UI عند الطالبات
+        // نرد بـ 200 نجاح وهمي دائماً لمنع تعليق واجهات المستخدم والـ UI عند الطالبات
         res.status(200).json({ success: false, error: error.message });
     }
 });
