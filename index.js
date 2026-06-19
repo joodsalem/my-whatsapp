@@ -119,24 +119,52 @@ app.get('/', (req, res) => {
     res.send('<h2 style="text-align:center; color:orange; font-family:sans-serif;">⏳ السيرفر يشتغل، انتظر ثواني لتوليد الباركود...</h2>');
 });
 
-// مسار إرسال الـ OTP
+// مسار إرسال الـ OTP المطور والمقاوم للخطأ 500
 app.post('/api/send-whatsapp', async (req, res) => {
     try {
-        if (!clientReady) return res.status(503).json({ error: 'WhatsApp not connected yet' });
+        if (!clientReady) {
+            console.log("⚠️ محاولة إرسال والواتساب غير متصل بالسيرفر");
+            return res.status(503).json({ error: 'WhatsApp not connected yet' });
+        }
 
         const { phoneNumber, otpCode } = req.body;
-        if (!phoneNumber || !otpCode) return res.status(400).json({ error: 'Phone and OTP required' });
+        if (!phoneNumber || !otpCode) {
+            return res.status(400).json({ error: 'Phone and OTP required' });
+        }
 
+        // 1. تنظيف الرقم تماماً
         let cleanNumber = phoneNumber.replace(/\D/g, '');
-        if (cleanNumber.startsWith('0')) cleanNumber = '967' + cleanNumber.substring(1);
-        else if (cleanNumber.startsWith('7') && cleanNumber.length === 9) cleanNumber = '967' + cleanNumber;
+        
+        // 2. معالجة المنطق لتركيب مفتاح اليمن
+        if (cleanNumber.startsWith('0')) {
+            cleanNumber = '967' + cleanNumber.substring(1);
+        } else if (cleanNumber.startsWith('7') && cleanNumber.length === 9) {
+            cleanNumber = '967' + cleanNumber;
+        }
 
+        // 3. صياغة المعرّف الافتراضي
         const chatId = cleanNumber + '@c.us';
         const message = `مرحباً بك في تطبيق رواء 💧\n\nرمز التحقق: *${otpCode}*`;
 
-        await client.sendMessage(chatId, message);
-        res.json({ success: true, message: 'تم الإرسال بنجاح' });
+        console.log(`📡 جاري فحص الرقم وإرسال الرسالة إلى: ${chatId}`);
+
+        // ✨ التعديل الآمن لمنع الانهيار (500): التحقق من تهيئة الرقم في سيرفر الواتساب
+        try {
+            const contact = await client.getNumberId(cleanNumber);
+            const targetId = contact ? contact._serialized : chatId;
+
+            await client.sendMessage(targetId, message);
+            console.log(`✅ [رواء] طارت الرسالة بنجاح إلى: ${targetId}`);
+            return res.json({ success: true, message: 'تم الإرسال بنجاح' });
+        } catch (sendError) {
+            console.error(`❌ فشل الإرسال عبر المعرف المهيأ، جاري التجربة الاحتياطية:`, sendError.message);
+            // محاولة أخيرة بالمعرف التقليدي في حال فشل الفحص المسبق
+            await client.sendMessage(chatId, message);
+            return res.json({ success: true, message: 'تم الإرسال بالطريقة الاحتياطية' });
+        }
+
     } catch (error) {
+        console.error(`💥 خطأ داخلي في السيرفر (500):`, error.message);
         res.status(500).json({ error: error.message });
     }
 });
