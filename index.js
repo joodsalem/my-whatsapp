@@ -64,7 +64,8 @@ const puppeteerConfig = {
         '--no-first-run',         
         '--no-zygote',            
         '--single-process',       
-        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
+        // تحديث الـ User-Agent إلى نسخة أحدث وأكثر استقراراً متوافقة مع التحديث الأخير لـ WhatsApp Web
+        '--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
     ],
     timeout: 0 
 };
@@ -119,7 +120,7 @@ app.get('/', (req, res) => {
     res.send('<h2 style="text-align:center; color:orange; font-family:sans-serif;">⏳ السيرفر يشتغل، انتظر ثواني لتوليد الباركود...</h2>');
 });
 
-// مسار إرسال الـ OTP الآمن والمستقر ضد انهيارات الـ 500
+// مسار إرسال الـ OTP المطور والمقاوم لأخطاء المتصفح (Detached Frame)
 app.post('/api/send-whatsapp', async (req, res) => {
     try {
         if (!clientReady) return res.status(503).json({ error: 'WhatsApp not connected yet' });
@@ -142,14 +143,34 @@ app.post('/api/send-whatsapp', async (req, res) => {
 
         console.log(`📡 جاري إرسال الرسالة مباشرة إلى: ${chatId} بالرمز: ${otpCode}`);
 
-        // إرسال مباشر وآمن من الأخطاء الداخلية
-        await client.sendMessage(chatId, message);
-        console.log(`✅ [رواء] طارت الرسالة بنجاح!`);
-        return res.json({ success: true, message: 'تم الإرسال بنجاح' });
+        // 🔄 آلية إعادة المحاولة (Retry) الذكية لتجاوز تعليقات فريم المتصفح المؤقتة
+        let attempts = 0;
+        const maxAttempts = 2;
+        let lastError = null;
+
+        while (attempts < maxAttempts) {
+            try {
+                await client.sendMessage(chatId, message);
+                console.log(`✅ [رواء] طارت الرسالة بنجاح في المحاولة رقم ${attempts + 1}!`);
+                return res.json({ success: true, message: 'تم الإرسال بنجاح' });
+            } catch (sendError) {
+                attempts++;
+                lastError = sendError;
+                console.warn(`⚠️ محاولة إرسال فاشلة (${attempts}/${maxAttempts}): ${sendError.message}`);
+                
+                // إذا واجهنا خطأ الفريم، ننتظر ثانية واحدة لكي يستقر المتصفح ثم نعيد المحاولة
+                if (attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+            }
+        }
+
+        // إذا وصلنا هنا فهذا يعني أن جميع المحاولات فشلت
+        throw lastError;
 
     } catch (error) {
-        console.error(`❌ خطأ أثناء إرسال الرسالة:`, error.message);
-        // نرد بـ 200 مع حالة فشل عشان الفلاتر ما يعلق ويعرف وش المشكلة
+        console.error(`❌ فشل الإرسال نهائياً:`, error.message);
+        // نرد بـ 200 مع حالة فشل لحماية التطبيق والفلاتر من الانهيار
         res.status(200).json({ success: false, error: error.message });
     }
 });
